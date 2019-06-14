@@ -1,0 +1,20 @@
+*.TMP
+*.o
+*.d
+*.bak
+*.i
+*.lst
+~*
+*.SchDocPreview
+*.LOG
+*.HarnessPreview
+Project/Schematic/History/*
+*.lck
+
+*.db
+
+Старые версии
+OldVersions
+*.m3~
+*.build_log.htm
+*.crf
