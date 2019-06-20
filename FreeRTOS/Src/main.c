@@ -55,6 +55,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "printf.h"
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,6 +88,8 @@ osThreadId myTask04Handle;
 osThreadId myTask05Handle;
 osThreadId myTask06Handle;
 osThreadId sPrintf_TASK7Handle;
+osThreadId QueuePrintfHandle;
+osMessageQId myQueue01Handle;
 /* USER CODE BEGIN PV */
 uint16_t temp;
 char str_buf[150];
@@ -103,6 +106,7 @@ void StartTask04(void const * argument);
 void StartTask05(void const * argument);
 void StartTask06(void const * argument);
 void StartsPrintf_TASK7(void const * argument);
+void StartQueuePrintf(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -122,6 +126,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
+  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -157,6 +162,15 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* definition and creation of myQueue01 */
+  osMessageQDef(myQueue01, 16, uint32_t);
+  myQueue01Handle = osMessageCreate(osMessageQ(myQueue01), NULL);
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
   osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
@@ -183,17 +197,16 @@ int main(void)
   myTask06Handle = osThreadCreate(osThread(myTask06), NULL);
 
   /* definition and creation of sPrintf_TASK7 */
-  //osThreadDef(sPrintf_TASK7, StartsPrintf_TASK7, osPriorityAboveNormal, 0, 128);
-  //sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), NULL);
+  osThreadDef(sPrintf_TASK7, StartsPrintf_TASK7, osPriorityAboveNormal, 0, 128);
+  sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), NULL);
+
+  /* definition and creation of QueuePrintf */
+  osThreadDef(QueuePrintf, StartQueuePrintf, osPriorityAboveNormal, 0, 128);
+  QueuePrintfHandle = osThreadCreate(osThread(QueuePrintf), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
- 
 
   /* Start scheduler */
   osKernelStart();
@@ -221,11 +234,11 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /**Configure the main internal regulator output voltage 
+  /** Configure the main internal regulator output voltage 
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks 
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
@@ -239,7 +252,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /**Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks 
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -308,7 +321,8 @@ void StartDefaultTask(void const * argument)
 		osThreadList((unsigned char *)(printf_arg.String));
 		
 		osThreadDef(sPrintf_TASK7, StartsPrintf_TASK7, osPriorityNormal, 0, 128);
-		sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), (void*)&printf_arg);
+		//sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), (void*)&printf_arg);
+		
 		
     osDelay(1000);
   }
@@ -390,7 +404,10 @@ void StartTask05(void const * argument)
   {
 		//printf("Task 5 entered\r\n"); 
     HAL_GPIO_TogglePin(LED_O_GPIO_Port, LED_O_Pin);
-    osDelay(310);
+		
+		osMessagePut(myQueue01Handle, osKernelSysTick(), 50000);
+		
+    osDelay(100);
   }
 	//
   /* USER CODE END StartTask05 */
@@ -452,6 +469,37 @@ void StartsPrintf_TASK7(void const * argument)
     //osDelay(1);
   }
   /* USER CODE END StartsPrintf_TASK7 */
+}
+
+/* USER CODE BEGIN Header_StartQueuePrintf */
+/**
+* @brief Function implementing the QueuePrintf thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartQueuePrintf */
+void StartQueuePrintf(void const * argument)
+{
+  /* USER CODE BEGIN StartQueuePrintf */
+  /* Infinite loop */
+  for(;;)
+  {
+		osEvent event;
+		event = osMessageGet(myQueue01Handle, 100);
+
+		if (event.status == osEventMessage)		{
+			printf("\nValue:");
+			do {				
+				printf(" %i", event.value.v);
+				event = osMessageGet(myQueue01Handle, 100); 
+			}	while (event.status == osEventMessage);
+		} else printf(".");
+	
+		//printf("\nosKernelSysTick() = %i",osKernelSysTick());
+    osDelay(2000);
+		
+  }
+  /* USER CODE END StartQueuePrintf */
 }
 
 /**
