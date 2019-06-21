@@ -66,6 +66,11 @@ typedef struct {
 	char String[300]; 
 }  Printf_arg_struct;
 
+typedef struct {
+	uint16_t value1;
+	uint16_t value2;
+	char text[40];
+}  struct_out;
 
 
 /* USER CODE END PTD */
@@ -90,6 +95,7 @@ osThreadId myTask06Handle;
 osThreadId sPrintf_TASK7Handle;
 osThreadId QueuePrintfHandle;
 osMessageQId myQueue01Handle;
+osMailQId strout_Queue;
 /* USER CODE BEGIN PV */
 uint16_t temp;
 char str_buf[150];
@@ -167,6 +173,10 @@ int main(void)
   osMessageQDef(myQueue01, 16, uint32_t);
   myQueue01Handle = osMessageCreate(osMessageQ(myQueue01), NULL);
 
+  /* definition and creation of myQueue02 */
+  osMailQDef(stroutqueue, 5, struct_out);
+	strout_Queue = osMailCreate(osMailQ(stroutqueue), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -201,7 +211,7 @@ int main(void)
   sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), NULL);
 
   /* definition and creation of QueuePrintf */
-  osThreadDef(QueuePrintf, StartQueuePrintf, osPriorityAboveNormal, 0, 128);
+  osThreadDef(QueuePrintf, StartQueuePrintf, osPriorityNormal, 0, 128);
   QueuePrintfHandle = osThreadCreate(osThread(QueuePrintf), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -315,12 +325,13 @@ void StartDefaultTask(void const * argument)
 {
 
   /* USER CODE BEGIN 5 */
+	
   /* Infinite loop */
   for(;;)
   {
-		osThreadList((unsigned char *)(printf_arg.String));
+		//osThreadList((unsigned char *)(printf_arg.String));		
+		//osThreadDef(sPrintf_TASK7, StartsPrintf_TASK7, osPriorityNormal, 0, 128);
 		
-		osThreadDef(sPrintf_TASK7, StartsPrintf_TASK7, osPriorityNormal, 0, 128);
 		//sPrintf_TASK7Handle = osThreadCreate(osThread(sPrintf_TASK7), (void*)&printf_arg);
 		
 		
@@ -402,10 +413,18 @@ void StartTask05(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-		//printf("Task 5 entered\r\n"); 
+		struct_out *qstruct;
+		qstruct = osMailAlloc(strout_Queue, osWaitForever);
+		
+		qstruct->value1 = osKernelSysTick();
+		sprintf(qstruct->text,"hello! ");
+		
+		osMailPut(strout_Queue, qstruct);
+		
     HAL_GPIO_TogglePin(LED_O_GPIO_Port, LED_O_Pin);
 		
-		osMessagePut(myQueue01Handle, osKernelSysTick(), 50000);
+		//osMessagePut(myQueue01Handle, osKernelSysTick(), 50000);
+
 		
     osDelay(100);
   }
@@ -460,13 +479,13 @@ void StartsPrintf_TASK7(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-		volatile Printf_arg_struct *arg;
+		/*volatile Printf_arg_struct *arg;
 		arg = (Printf_arg_struct*) argument;		
 		
 		printf((char *)arg->String);				
 		printf("\n"); 
-		osThreadTerminate(sPrintf_TASK7Handle);
-    //osDelay(1);
+		osThreadTerminate(sPrintf_TASK7Handle);*/
+    osDelay(1);
   }
   /* USER CODE END StartsPrintf_TASK7 */
 }
@@ -484,19 +503,28 @@ void StartQueuePrintf(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-		osEvent event;
-		event = osMessageGet(myQueue01Handle, 100);
-
-		if (event.status == osEventMessage)		{
+		osEvent event1;
+		struct_out *qstruct;
+		
+		event1 = osMailGet(strout_Queue, osWaitForever);
+		
+		if (event1.status == osEventMail) {
+			do {				
+				qstruct = event1.value.p;
+				printf("\n%s%i",qstruct->text,qstruct->value1);
+				event1 = osMailGet(strout_Queue, osWaitForever);
+			}	while (event1.status == osEventMail);
+		}
+		/*if (event.status == osEventMessage)		{
 			printf("\nValue:");
 			do {				
 				printf(" %i", event.value.v);
 				event = osMessageGet(myQueue01Handle, 100); 
 			}	while (event.status == osEventMessage);
-		} else printf(".");
+		} else printf(".");*/
 	
 		//printf("\nosKernelSysTick() = %i",osKernelSysTick());
-    osDelay(2000);
+    osDelay(200);
 		
   }
   /* USER CODE END StartQueuePrintf */
