@@ -60,6 +60,10 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct {
+	uint16_t var1;
+	char text1[50];
+}  test_struct;
 
 /* USER CODE END PTD */
 
@@ -80,6 +84,7 @@ osThreadId myTask03Handle;
 osThreadId myTask04Handle;
 osThreadId myTask05Handle;
 osThreadId myTask06Handle;
+osSemaphoreId myBinarySem01Handle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -139,6 +144,11 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* definition and creation of myBinarySem01 */
+  osSemaphoreDef(myBinarySem01);
+  myBinarySem01Handle = osSemaphoreCreate(osSemaphore(myBinarySem01), 1);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -351,9 +361,17 @@ void StartTask04(void const * argument)
   for(;;)
   {
 		//printf("Task 4 entered\r\n"); 
-    HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+		if (myBinarySem01Handle != NULL) {
+			if(osSemaphoreWait(myBinarySem01Handle , 1000) == osOK) {
+				
+				HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+				
+				osSemaphoreRelease(myBinarySem01Handle);
+			}
+			
+		}
     osDelay(250);
-  }
+ }
   /* USER CODE END StartTask04 */
 }
 
@@ -390,6 +408,12 @@ void StartTask06(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+		if (HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin)) {
+			osSemaphoreWait(myBinarySem01Handle , 100);
+			
+		} else if (!HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin)) {
+			osSemaphoreRelease(myBinarySem01Handle);
+		}
 		osDelay(100);
   }
   /* USER CODE END StartTask06 */
