@@ -29,7 +29,7 @@
 "freertos\stream_buffer.o"
 "freertos\tasks.o"
 "freertos\timers.o"
-"freertos\cmsis_os.o"
+"freertos\cmsis_os2.o"
 "freertos\heap_4.o"
 "freertos\port.o"
 --library_type=microlib --strict --scatter "freertos\freertos.sct"

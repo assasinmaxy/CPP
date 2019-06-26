@@ -83,7 +83,9 @@ osThreadId myTask02Handle;
 osThreadId myTask03Handle;
 osThreadId myTask04Handle;
 osThreadId myTask05Handle;
-osThreadId myTask06Handle;
+osThreadId ButtonProcHandle;
+osThreadId ButtonParseHandle;
+osMessageQId myQueue01Handle;
 osSemaphoreId myBinarySem01Handle;
 /* USER CODE BEGIN PV */
 
@@ -97,7 +99,8 @@ void StartTask02(void const * argument);
 void StartTask03(void const * argument);
 void StartTask04(void const * argument);
 void StartTask05(void const * argument);
-void StartTask06(void const * argument);
+void StartButtonProc(void const * argument);
+void StartButtonParse(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -158,6 +161,11 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* definition and creation of myQueue01 */
+  osMessageQDef(myQueue01, 16, uint16_t);
+  myQueue01Handle = osMessageCreate(osMessageQ(myQueue01), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -183,9 +191,13 @@ int main(void)
   osThreadDef(myTask05, StartTask05, osPriorityIdle, 0, 128);
   myTask05Handle = osThreadCreate(osThread(myTask05), NULL);
 
-  /* definition and creation of myTask06 */
-  osThreadDef(myTask06, StartTask06, osPriorityIdle, 0, 128);
-  myTask06Handle = osThreadCreate(osThread(myTask06), NULL);
+  /* definition and creation of ButtonProc */
+  osThreadDef(ButtonProc, StartButtonProc, osPriorityNormal, 0, 128);
+  ButtonProcHandle = osThreadCreate(osThread(ButtonProc), NULL);
+
+  /* definition and creation of ButtonParse */
+  osThreadDef(ButtonParse, StartButtonParse, osPriorityNormal, 0, 128);
+  ButtonParseHandle = osThreadCreate(osThread(ButtonParse), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -270,7 +282,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : Button_Pin */
   GPIO_InitStruct.Pin = Button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
@@ -280,6 +292,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
 
@@ -362,12 +378,12 @@ void StartTask04(void const * argument)
   {
 		//printf("Task 4 entered\r\n"); 
 		if (myBinarySem01Handle != NULL) {
-			if(osSemaphoreWait(myBinarySem01Handle , 1000) == osOK) {
+		//	if(osSemaphoreWait(myBinarySem01Handle , 1000) == osOK) {
 				
 				HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
 				
-				osSemaphoreRelease(myBinarySem01Handle);
-			}
+		//		osSemaphoreRelease(myBinarySem01Handle);
+		//	}
 			
 		}
     osDelay(250);
@@ -395,28 +411,58 @@ void StartTask05(void const * argument)
   /* USER CODE END StartTask05 */
 }
 
-/* USER CODE BEGIN Header_StartTask06 */
+/* USER CODE BEGIN Header_StartButtonProc */
 /**
-* @brief Function implementing the myTask06 thread.
+* @brief Function implementing the ButtonProc thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTask06 */
-void StartTask06(void const * argument)
+/* USER CODE END Header_StartButtonProc */
+void StartButtonProc(void const * argument)
 {
-  /* USER CODE BEGIN StartTask06 */
+  /* USER CODE BEGIN StartButtonProc */
   /* Infinite loop */
   for(;;)
   {
-		if (HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin)) {
-			osSemaphoreWait(myBinarySem01Handle , 100);
+    if (HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin)) {
+			//osSemaphoreWait(myBinarySem01Handle , 100);
 			
 		} else if (!HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin)) {
-			osSemaphoreRelease(myBinarySem01Handle);
+			//osSemaphoreRelease(myBinarySem01Handle);
 		}
 		osDelay(100);
   }
-  /* USER CODE END StartTask06 */
+  /* USER CODE END StartButtonProc */
+}
+
+/* USER CODE BEGIN Header_StartButtonParse */
+/**
+* @brief Function implementing the ButtonParse thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartButtonParse */
+void StartButtonParse(void const * argument)
+{
+  /* USER CODE BEGIN StartButtonParse */
+  /* Infinite loop */
+  for(;;)
+  {
+		osEvent event; //создаем структуру данных которые нужно принять
+		//event = osMessageGet(myQueue01Handle, 100); //забираем данные из структуры
+		
+		printf("\nButton states: ");
+		if (event.status == osEventMessage) { //проверяем, не пустая ли структура
+			 do {				
+				 printf("%i", event.value.v); //данные хранятся в event.value.v
+				 if (event.value.v == 0) printf (" ");
+			//		event = osMessageGet(myQueue01Handle, 100); // проверяем, есть ли что еще в очереди
+			 } while (event.status == osEventMessage); // проверяем, есть ли что еще в очереди
+		}
+
+    osDelay(5000);
+  }
+  /* USER CODE END StartButtonParse */
 }
 
 /**
